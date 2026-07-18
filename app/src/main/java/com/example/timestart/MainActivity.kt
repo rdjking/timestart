@@ -99,6 +99,7 @@ class MainActivity : ComponentActivity() {
                             OverlayPermission.requestFrom(this)
                         },
                         onTaskEnabledChanged = homeViewModel::setTaskEnabled,
+                        onTaskCurrentOccurrenceSkipped = homeViewModel::skipTaskCurrentOccurrence,
                         onTaskDeleted = homeViewModel::deleteTask,
                         onTaskEdited = { taskId ->
                             createTaskViewModel.beginEditing(taskId)

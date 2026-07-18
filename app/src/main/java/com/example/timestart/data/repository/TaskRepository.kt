@@ -7,6 +7,7 @@ import com.example.timestart.data.local.TaskEntity
 import com.example.timestart.domain.scheduling.NextTriggerCalculator
 import kotlinx.coroutines.flow.Flow
 import java.time.Duration
+import java.time.Instant
 import java.time.ZonedDateTime
 
 class TaskRepository(
@@ -42,7 +43,17 @@ class TaskRepository(
     fun setEnabled(taskId: Long, enabled: Boolean) {
         if (!enabled) {
             taskDao.setEnabled(taskId, false)
+            taskDao.setResumeAfterSkippedOccurrence(taskId, false)
             scheduler.cancel(taskId)
+            executionLogDao.insert(
+                ExecutionLogEntity(
+                    taskId = taskId,
+                    occurredAt = System.currentTimeMillis(),
+                    eventType = "TASK_DISABLED",
+                    resultCode = "OK",
+                    message = "Task disabled by user",
+                ),
+            )
             return
         }
 
@@ -52,12 +63,45 @@ class TaskRepository(
             ?.toEpochMilli()
 
         taskDao.updateNextTriggerAt(taskId, nextTriggerAt)
+        taskDao.setResumeAfterSkippedOccurrence(taskId, false)
         taskDao.setEnabled(taskId, nextTriggerAt != null)
         if (nextTriggerAt != null) {
             scheduler.schedule(taskId)
         } else {
             scheduler.cancel(taskId)
         }
+    }
+
+    /**
+     * Temporarily turns off a task until its currently scheduled trigger has passed.
+     * The original alarm is retained solely to restore the task; no target app is launched then.
+     */
+    fun skipCurrentOccurrence(taskId: Long) {
+        val task = taskDao.getById(taskId) ?: return
+        if (!task.enabled) return
+
+        val currentOccurrence = task.nextTriggerAt
+            ?.let { Instant.ofEpochMilli(it).atZone(now().zone) }
+            ?: NextTriggerCalculator.nextOrNull(task.toScheduleTask(), now())
+        if (currentOccurrence != null) {
+            taskDao.updateNextTriggerAt(taskId, currentOccurrence.toInstant().toEpochMilli())
+            taskDao.setEnabled(taskId, false)
+            taskDao.setResumeAfterSkippedOccurrence(taskId, true)
+            scheduler.schedule(taskId)
+        } else {
+            taskDao.setEnabled(taskId, false)
+            taskDao.setResumeAfterSkippedOccurrence(taskId, false)
+            scheduler.cancel(taskId)
+        }
+        executionLogDao.insert(
+            ExecutionLogEntity(
+                taskId = taskId,
+                occurredAt = System.currentTimeMillis(),
+                eventType = "OCCURRENCE_SKIPPED",
+                resultCode = "OK",
+                message = "Current scheduled occurrence skipped by user",
+            ),
+        )
     }
 
     fun update(task: TaskEntity) {

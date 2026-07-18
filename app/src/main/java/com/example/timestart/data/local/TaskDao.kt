@@ -15,6 +15,12 @@ interface TaskDao {
     fun getEnabledOrderedByNextTrigger(): List<TaskEntity>
 
     @Query(
+        "SELECT * FROM schedule_tasks WHERE enabled = 1 OR resumeAfterSkippedOccurrence = 1 " +
+            "ORDER BY nextTriggerAt ASC",
+    )
+    fun getScheduledOrPendingResumeTasks(): List<TaskEntity>
+
+    @Query(
         "SELECT * FROM schedule_tasks " +
             "ORDER BY CASE WHEN nextTriggerAt IS NULL THEN 1 ELSE 0 END, nextTriggerAt ASC, id ASC",
     )
@@ -28,6 +34,9 @@ interface TaskDao {
 
     @Query("UPDATE schedule_tasks SET nextTriggerAt = :nextTriggerAt WHERE id = :id")
     fun updateNextTriggerAt(id: Long, nextTriggerAt: Long?)
+
+    @Query("UPDATE schedule_tasks SET resumeAfterSkippedOccurrence = :shouldResume WHERE id = :id")
+    fun setResumeAfterSkippedOccurrence(id: Long, shouldResume: Boolean)
 
     @Query("DELETE FROM schedule_tasks WHERE id = :id")
     fun deleteById(id: Long)

@@ -10,7 +10,7 @@ import com.example.timestart.data.local.TaskDao
 import com.example.timestart.data.repository.TaskScheduler
 import com.example.timestart.platform.service.SchedulerForegroundService
 
-/** Schedules one user-visible exact alarm for each enabled task. */
+/** Schedules one user-visible exact alarm for each enabled task or one pending skip restoration. */
 class AlarmManagerTaskScheduler(
     context: Context,
     private val taskDao: TaskDao,
@@ -21,7 +21,7 @@ class AlarmManagerTaskScheduler(
     override fun schedule(taskId: Long) {
         val task = taskDao.getById(taskId)
         val triggerAt = task?.nextTriggerAt
-        if (task == null || !task.enabled || triggerAt == null) {
+        if (task == null || (!task.enabled && !task.resumeAfterSkippedOccurrence) || triggerAt == null) {
             cancel(taskId)
             return
         }

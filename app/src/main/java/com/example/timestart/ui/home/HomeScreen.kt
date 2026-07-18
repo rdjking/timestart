@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -41,9 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @Composable
 @androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,6 +58,7 @@ fun HomeScreen(
     onRequestExactAlarmPermission: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onTaskEnabledChanged: (Long, Boolean) -> Unit,
+    onTaskCurrentOccurrenceSkipped: (Long) -> Unit,
     onTaskDeleted: (Long) -> Unit,
     onTaskEdited: (Long) -> Unit,
     onTaskCopied: (Long) -> Unit,
@@ -148,6 +153,7 @@ fun HomeScreen(
                     TaskCard(
                         task = task,
                         onEnabledChanged = onTaskEnabledChanged,
+                        onCurrentOccurrenceSkipped = onTaskCurrentOccurrenceSkipped,
                         onDeleted = onTaskDeleted,
                         onEdited = onTaskEdited,
                         onCopied = onTaskCopied,
@@ -288,12 +294,14 @@ private fun EmptyTaskState(onCreateTask: () -> Unit) {
 private fun TaskCard(
     task: HomeTaskItem,
     onEnabledChanged: (Long, Boolean) -> Unit,
+    onCurrentOccurrenceSkipped: (Long) -> Unit,
     onDeleted: (Long) -> Unit,
     onEdited: (Long) -> Unit,
     onCopied: (Long) -> Unit,
     onLogsRequested: (Long) -> Unit,
 ) {
     var showDeleteConfirmation by remember(task.id) { mutableStateOf(false) }
+    var showTaskCloseDialog by remember(task.id) { mutableStateOf(false) }
     var showMoreMenu by remember(task.id) { mutableStateOf(false) }
     Card(
         modifier = Modifier
@@ -357,10 +365,75 @@ private fun TaskCard(
             }
             Switch(
                 checked = task.enabled,
-                onCheckedChange = { onEnabledChanged(task.id, it) },
+                onCheckedChange = { enabled ->
+                    if (enabled) {
+                        onEnabledChanged(task.id, true)
+                    } else {
+                        showTaskCloseDialog = true
+                    }
+                },
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = 14.dp),
             )
         }
+    }
+    if (showTaskCloseDialog) {
+        Dialog(
+            onDismissRequest = { showTaskCloseDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        TextButton(
+                            onClick = {
+                                onCurrentOccurrenceSkipped(task.id)
+                                showTaskCloseDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+                        ) {
+                            Text(
+                                text = "仅跳过${task.currentOccurrenceDateLabel}一次",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                onEnabledChanged(task.id, false)
+                                showTaskCloseDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 18.dp),
+                        ) {
+                            Text(
+                                text = "关闭此重复任务",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        TextButton(
+                            onClick = { showTaskCloseDialog = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 16.dp),
+                        ) {
+                            Text("取消", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+        }
+    }
     }
     if (showDeleteConfirmation) {
         AlertDialog(

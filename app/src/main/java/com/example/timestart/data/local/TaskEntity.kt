@@ -19,6 +19,7 @@ data class TaskEntity(
     val ruleValue: String? = null,
     val enabled: Boolean = true,
     val nextTriggerAt: Long? = null,
+    val resumeAfterSkippedOccurrence: Boolean = false,
 ) {
     companion object {
         fun from(task: ScheduleTask): TaskEntity = TaskEntity(

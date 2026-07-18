@@ -24,6 +24,12 @@ class HomeViewModel(
         }
     }
 
+    fun skipTaskCurrentOccurrence(taskId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.skipCurrentOccurrence(taskId)
+        }
+    }
+
     fun deleteTask(taskId: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.delete(taskId)

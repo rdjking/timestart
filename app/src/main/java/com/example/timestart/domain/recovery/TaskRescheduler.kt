@@ -13,7 +13,25 @@ class TaskRescheduler(
 ) {
     fun rescheduleEnabledTasks() {
         val recoveryTime = now()
-        taskDao.getEnabledOrderedByNextTrigger().forEach { entity ->
+        taskDao.getScheduledOrPendingResumeTasks().forEach { entity ->
+            if (entity.resumeAfterSkippedOccurrence) {
+                val skippedOccurrence = entity.nextTriggerAt
+                    ?.let { java.time.Instant.ofEpochMilli(it).atZone(recoveryTime.zone) }
+                if (skippedOccurrence != null && skippedOccurrence.isAfter(recoveryTime)) {
+                    scheduler.schedule(entity.id)
+                    return@forEach
+                }
+
+                val nextTrigger = NextTriggerCalculator.nextOrNull(
+                    entity.toScheduleTask(),
+                    skippedOccurrence?.plusNanos(1) ?: recoveryTime,
+                )
+                taskDao.updateNextTriggerAt(entity.id, nextTrigger?.toInstant()?.toEpochMilli())
+                taskDao.setResumeAfterSkippedOccurrence(entity.id, false)
+                taskDao.setEnabled(entity.id, nextTrigger != null)
+                if (nextTrigger == null) scheduler.cancel(entity.id) else scheduler.schedule(entity.id)
+                return@forEach
+            }
             val nextTrigger = NextTriggerCalculator.nextOrNull(entity.toScheduleTask(), recoveryTime)
             if (nextTrigger == null) {
                 taskDao.updateNextTriggerAt(entity.id, null)

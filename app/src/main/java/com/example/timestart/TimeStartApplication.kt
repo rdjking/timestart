@@ -20,6 +20,7 @@ class TimeStartApplication : Application() {
     val database: TimeStartDatabase by lazy {
         Room.databaseBuilder(this, TimeStartDatabase::class.java, "timestart.db")
             .addMigrations(TimeStartMigrations.MIGRATION_2_3)
+            .addMigrations(TimeStartMigrations.MIGRATION_3_4)
             .build()
     }
 

@@ -2,6 +2,7 @@ package com.example.timestart.ui.home
 
 import com.example.timestart.data.local.TaskEntity
 import java.time.Instant
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -16,6 +17,7 @@ data class HomeTaskItem(
     val enabled: Boolean,
     val nextTriggerLabel: String,
     val nextTriggerDetailLabel: String,
+    val currentOccurrenceDateLabel: String,
 ) {
     companion object {
         fun from(task: TaskEntity): HomeTaskItem = HomeTaskItem(
@@ -27,6 +29,7 @@ data class HomeTaskItem(
             enabled = task.enabled,
             nextTriggerLabel = task.nextTriggerLabel(),
             nextTriggerDetailLabel = task.nextTriggerDetailLabel(),
+            currentOccurrenceDateLabel = task.currentOccurrenceDateLabel(),
         )
     }
 }
@@ -50,6 +53,22 @@ private fun TaskEntity.nextTriggerDetailLabel(): String {
     return Instant.ofEpochMilli(triggerAt)
         .atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofPattern("MM月dd日 HH:mm", Locale.getDefault()))
+}
+
+private fun TaskEntity.currentOccurrenceDateLabel(): String {
+    if (!enabled) return "当前"
+    val triggerAt = nextTriggerAt ?: return "当前"
+    val date = Instant.ofEpochMilli(triggerAt).atZone(ZoneId.systemDefault()).toLocalDate()
+    val weekday = when (date.dayOfWeek) {
+        DayOfWeek.MONDAY -> "周一"
+        DayOfWeek.TUESDAY -> "周二"
+        DayOfWeek.WEDNESDAY -> "周三"
+        DayOfWeek.THURSDAY -> "周四"
+        DayOfWeek.FRIDAY -> "周五"
+        DayOfWeek.SATURDAY -> "周六"
+        DayOfWeek.SUNDAY -> "周日"
+    }
+    return "${date.monthValue}月${date.dayOfMonth}日（$weekday）"
 }
 
 private fun String.toRuleLabel(): String = when (this) {

@@ -22,6 +22,25 @@ class TaskTriggerCoordinator(
             return
         }
 
+        if (entity.resumeAfterSkippedOccurrence) {
+            val skippedOccurrence = entity.nextTriggerAt
+                ?.let { java.time.Instant.ofEpochMilli(it).atZone(now().zone) }
+            val nextTrigger = NextTriggerCalculator.nextOrNull(
+                entity.toScheduleTask(),
+                skippedOccurrence?.plusNanos(1) ?: now(),
+            )
+            taskDao.updateNextTriggerAt(taskId, nextTrigger?.toInstant()?.toEpochMilli())
+            taskDao.setResumeAfterSkippedOccurrence(taskId, false)
+            taskDao.setEnabled(taskId, nextTrigger != null)
+            if (nextTrigger == null) {
+                scheduler.cancel(taskId)
+            } else {
+                scheduler.schedule(taskId)
+            }
+            appendLog(taskId, "SKIP_COMPLETED", "OK", "Skipped occurrence passed; task restored")
+            return
+        }
+
         if (!entity.enabled) {
             scheduler.cancel(taskId)
             appendLog(taskId, "ALARM_IGNORED", "TASK_DISABLED", "Task is disabled")

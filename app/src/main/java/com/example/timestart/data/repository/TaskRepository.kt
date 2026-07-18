@@ -1,0 +1,118 @@
+package com.example.timestart.data.repository
+
+import com.example.timestart.data.local.ExecutionLogDao
+import com.example.timestart.data.local.ExecutionLogEntity
+import com.example.timestart.data.local.TaskDao
+import com.example.timestart.data.local.TaskEntity
+import com.example.timestart.domain.scheduling.NextTriggerCalculator
+import kotlinx.coroutines.flow.Flow
+import java.time.Duration
+import java.time.ZonedDateTime
+
+class TaskRepository(
+    private val taskDao: TaskDao,
+    private val executionLogDao: ExecutionLogDao,
+    private val scheduler: TaskScheduler,
+    private val now: () -> ZonedDateTime = ZonedDateTime::now,
+) {
+    fun observeTasks(): Flow<List<TaskEntity>> = taskDao.observeAllOrderedByNextTrigger()
+
+    fun getTask(taskId: Long): TaskEntity? = taskDao.getById(taskId)
+
+    fun observeLogs(taskId: Long?): Flow<List<ExecutionLogEntity>> = if (taskId == null) {
+        executionLogDao.observeAll()
+    } else {
+        executionLogDao.observeForTask(taskId)
+    }
+
+    fun clearLogsOlderThan(cutoffMillis: Long): Int = executionLogDao.deleteOlderThan(cutoffMillis)
+
+    fun clearExpiredLogs(nowMillis: Long = System.currentTimeMillis()): Int =
+        clearLogsOlderThan(nowMillis - Duration.ofDays(30).toMillis())
+
+    fun save(task: TaskEntity): Long {
+        val taskToSave = task.withNextTriggerIfNeeded()
+        val id = taskDao.insert(taskToSave)
+        if (taskToSave.enabled && taskToSave.nextTriggerAt != null) {
+            scheduler.schedule(id)
+        }
+        return id
+    }
+
+    fun setEnabled(taskId: Long, enabled: Boolean) {
+        if (!enabled) {
+            taskDao.setEnabled(taskId, false)
+            scheduler.cancel(taskId)
+            return
+        }
+
+        val task = taskDao.getById(taskId) ?: return
+        val nextTriggerAt = NextTriggerCalculator.nextOrNull(task.toScheduleTask(), now())
+            ?.toInstant()
+            ?.toEpochMilli()
+
+        taskDao.updateNextTriggerAt(taskId, nextTriggerAt)
+        taskDao.setEnabled(taskId, nextTriggerAt != null)
+        if (nextTriggerAt != null) {
+            scheduler.schedule(taskId)
+        } else {
+            scheduler.cancel(taskId)
+        }
+    }
+
+    fun update(task: TaskEntity) {
+        require(task.id != 0L) { "A task must have an ID before it can be updated" }
+        scheduler.cancel(task.id)
+        val taskToSave = task.copy(nextTriggerAt = null).withNextTriggerIfNeeded()
+        taskDao.insert(taskToSave)
+        if (taskToSave.enabled && taskToSave.nextTriggerAt != null) {
+            scheduler.schedule(taskToSave.id)
+        }
+        executionLogDao.insert(
+            ExecutionLogEntity(
+                taskId = task.id,
+                occurredAt = System.currentTimeMillis(),
+                eventType = "TASK_UPDATED",
+                resultCode = "OK",
+                message = "Task updated",
+            ),
+        )
+    }
+
+    fun copy(taskId: Long): Long {
+        val source = requireNotNull(taskDao.getById(taskId)) { "Task $taskId does not exist" }
+        val copiedTaskId = save(source.copy(id = 0, nextTriggerAt = null))
+        executionLogDao.insert(
+            ExecutionLogEntity(
+                taskId = copiedTaskId,
+                occurredAt = System.currentTimeMillis(),
+                eventType = "TASK_COPIED",
+                resultCode = "OK",
+                message = "Task copied from $taskId",
+            ),
+        )
+        return copiedTaskId
+    }
+
+    fun delete(taskId: Long) {
+        scheduler.cancel(taskId)
+        taskDao.deleteById(taskId)
+        executionLogDao.insert(
+            ExecutionLogEntity(
+                taskId = taskId,
+                occurredAt = System.currentTimeMillis(),
+                eventType = "TASK_DELETED",
+                resultCode = "OK",
+                message = "Task deleted",
+            ),
+        )
+    }
+
+    private fun TaskEntity.withNextTriggerIfNeeded(): TaskEntity {
+        if (!enabled || nextTriggerAt != null) return this
+        val nextTriggerAt = NextTriggerCalculator.nextOrNull(toScheduleTask(), now())
+            ?.toInstant()
+            ?.toEpochMilli()
+        return copy(nextTriggerAt = nextTriggerAt)
+    }
+}

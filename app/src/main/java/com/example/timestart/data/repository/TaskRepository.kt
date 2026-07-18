@@ -5,6 +5,8 @@ import com.example.timestart.data.local.ExecutionLogEntity
 import com.example.timestart.data.local.TaskDao
 import com.example.timestart.data.local.TaskEntity
 import com.example.timestart.domain.scheduling.NextTriggerCalculator
+import com.example.timestart.domain.holiday.HolidayCalendar
+import com.example.timestart.domain.holiday.LocalWeekPatternHolidayCalendar
 import kotlinx.coroutines.flow.Flow
 import java.time.Duration
 import java.time.Instant
@@ -15,6 +17,7 @@ class TaskRepository(
     private val executionLogDao: ExecutionLogDao,
     private val scheduler: TaskScheduler,
     private val now: () -> ZonedDateTime = ZonedDateTime::now,
+    private val holidayCalendar: HolidayCalendar = LocalWeekPatternHolidayCalendar,
 ) {
     fun observeTasks(): Flow<List<TaskEntity>> = taskDao.observeAllOrderedByNextTrigger()
 
@@ -58,7 +61,7 @@ class TaskRepository(
         }
 
         val task = taskDao.getById(taskId) ?: return
-        val nextTriggerAt = NextTriggerCalculator.nextOrNull(task.toScheduleTask(), now())
+        val nextTriggerAt = NextTriggerCalculator.nextOrNull(task.toScheduleTask(), now(), holidayCalendar)
             ?.toInstant()
             ?.toEpochMilli()
 
@@ -82,7 +85,7 @@ class TaskRepository(
 
         val currentOccurrence = task.nextTriggerAt
             ?.let { Instant.ofEpochMilli(it).atZone(now().zone) }
-            ?: NextTriggerCalculator.nextOrNull(task.toScheduleTask(), now())
+            ?: NextTriggerCalculator.nextOrNull(task.toScheduleTask(), now(), holidayCalendar)
         if (currentOccurrence != null) {
             taskDao.updateNextTriggerAt(taskId, currentOccurrence.toInstant().toEpochMilli())
             taskDao.setEnabled(taskId, false)
@@ -154,7 +157,7 @@ class TaskRepository(
 
     private fun TaskEntity.withNextTriggerIfNeeded(): TaskEntity {
         if (!enabled || nextTriggerAt != null) return this
-        val nextTriggerAt = NextTriggerCalculator.nextOrNull(toScheduleTask(), now())
+        val nextTriggerAt = NextTriggerCalculator.nextOrNull(toScheduleTask(), now(), holidayCalendar)
             ?.toInstant()
             ?.toEpochMilli()
         return copy(nextTriggerAt = nextTriggerAt)

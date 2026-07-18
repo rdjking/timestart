@@ -1,5 +1,9 @@
 package com.example.timestart.domain.scheduling
 
+import com.example.timestart.domain.holiday.HolidayCalendar
+import com.example.timestart.domain.holiday.HolidayDataSource
+import com.example.timestart.domain.holiday.HolidayDayInfo
+import com.example.timestart.domain.holiday.HolidayDayType
 import com.example.timestart.domain.model.ScheduleRule
 import com.example.timestart.domain.model.ScheduleTask
 import java.time.LocalDate
@@ -89,17 +93,24 @@ class NextTriggerCalculatorTest {
     }
 
     @Test
-    fun `checks every day for a statutory workday schedule`() {
+    fun `skips a non makeup Sunday for a statutory workday schedule`() {
         val zone = ZoneId.of("Asia/Shanghai")
-        val task = ScheduleTask(hour = 8, minute = 30, rule = ScheduleRule.StatutoryWorkday)
+        val task = ScheduleTask(hour = 20, minute = 9, rule = ScheduleRule.StatutoryWorkday)
+        val calendar = MapHolidayCalendar(
+            mapOf(
+                LocalDate.of(2026, 7, 19) to HolidayDayType.WEEKEND,
+                LocalDate.of(2026, 7, 20) to HolidayDayType.WORKDAY,
+            ),
+        )
 
         val result = NextTriggerCalculator.next(
             task,
-            ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(8, 0), zone),
+            ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(21, 41), zone),
+            calendar,
         )
 
         assertEquals(
-            ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(8, 30), zone),
+            ZonedDateTime.of(LocalDate.of(2026, 7, 20), LocalTime.of(20, 9), zone),
             result,
         )
     }
@@ -250,6 +261,15 @@ class NextTriggerCalculatorTest {
         assertEquals(
             ZonedDateTime.of(LocalDate.of(2028, 2, 29), LocalTime.of(9, 0), zone),
             result,
+        )
+    }
+
+    private class MapHolidayCalendar(
+        private val types: Map<LocalDate, HolidayDayType>,
+    ) : HolidayCalendar {
+        override fun dayInfo(date: LocalDate): HolidayDayInfo = HolidayDayInfo(
+            type = requireNotNull(types[date]) { "Missing holiday data for $date" },
+            source = HolidayDataSource.NETWORK,
         )
     }
 }

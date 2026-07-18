@@ -33,6 +33,7 @@ class TaskTriggerCoordinator(
             val nextTrigger = NextTriggerCalculator.nextOrNull(
                 entity.toScheduleTask(),
                 skippedOccurrence?.plusNanos(1) ?: triggerTime,
+                holidayCalendar,
             )
             taskDao.updateNextTriggerAt(taskId, nextTrigger?.toInstant()?.toEpochMilli())
             taskDao.setResumeAfterSkippedOccurrence(taskId, false)
@@ -53,7 +54,7 @@ class TaskTriggerCoordinator(
         }
 
         val scheduleTask = entity.toScheduleTask()
-        val nextTrigger = NextTriggerCalculator.nextOrNull(scheduleTask, triggerTime)
+        val nextTrigger = NextTriggerCalculator.nextOrNull(scheduleTask, triggerTime, holidayCalendar)
         if (nextTrigger == null) {
             taskDao.updateNextTriggerAt(taskId, null)
             taskDao.setEnabled(taskId, false)

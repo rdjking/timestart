@@ -46,16 +46,17 @@ class TimeStartApplication : Application() {
     }
 
     val taskRepository: TaskRepository by lazy {
-        TaskRepository(database.taskDao(), database.executionLogDao(), taskScheduler)
+        TaskRepository(database.taskDao(), database.executionLogDao(), taskScheduler, holidayCalendar = holidayCalendar)
     }
 
     val taskRescheduler: TaskRescheduler by lazy {
-        TaskRescheduler(database.taskDao(), taskScheduler)
+        TaskRescheduler(database.taskDao(), taskScheduler, holidayCalendar = holidayCalendar)
     }
 
     override fun onCreate() {
         super.onCreate()
         applicationScope.launch {
+            taskRescheduler.rescheduleEnabledTasks()
             taskRepository.clearExpiredLogs()
         }
     }

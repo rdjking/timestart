@@ -4,6 +4,10 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.timestart.data.local.TaskEntity
 import com.example.timestart.data.local.TimeStartDatabase
+import com.example.timestart.domain.holiday.HolidayCalendar
+import com.example.timestart.domain.holiday.HolidayDataSource
+import com.example.timestart.domain.holiday.HolidayDayInfo
+import com.example.timestart.domain.holiday.HolidayDayType
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -11,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.time.ZonedDateTime
+import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 class TaskRepositoryTest {
@@ -62,6 +67,38 @@ class TaskRepositoryTest {
 
         assertEquals(now.plusMinutes(30).toInstant().toEpochMilli(), database.taskDao().getById(id)?.nextTriggerAt)
         assertEquals(listOf(id), scheduler.scheduledIds)
+    }
+
+    @Test
+    fun `save skips Sunday when calculating a statutory workday task`() {
+        val now = ZonedDateTime.parse("2026-07-18T21:41:00+08:00[Asia/Shanghai]")
+        val deterministicRepository = TaskRepository(
+            database.taskDao(),
+            database.executionLogDao(),
+            scheduler,
+            now = { now },
+            holidayCalendar = MapHolidayCalendar(
+                mapOf(
+                    LocalDate.of(2026, 7, 19) to HolidayDayType.WEEKEND,
+                    LocalDate.of(2026, 7, 20) to HolidayDayType.WORKDAY,
+                ),
+            ),
+        )
+
+        val id = deterministicRepository.save(
+            TaskEntity(
+                packageName = "com.tencent.mobileqq",
+                appLabel = "QQ",
+                hour = 20,
+                minute = 9,
+                ruleType = "STATUTORY_WORKDAY",
+            ),
+        )
+
+        assertEquals(
+            ZonedDateTime.parse("2026-07-20T20:09:00+08:00[Asia/Shanghai]").toInstant().toEpochMilli(),
+            database.taskDao().getById(id)?.nextTriggerAt,
+        )
     }
 
     @Test
@@ -209,5 +246,14 @@ class TaskRepositoryTest {
         override fun cancel(taskId: Long) {
             cancelledIds += taskId
         }
+    }
+
+    private class MapHolidayCalendar(
+        private val types: Map<LocalDate, HolidayDayType>,
+    ) : HolidayCalendar {
+        override fun dayInfo(date: LocalDate): HolidayDayInfo = HolidayDayInfo(
+            type = requireNotNull(types[date]) { "Missing holiday data for $date" },
+            source = HolidayDataSource.NETWORK,
+        )
     }
 }

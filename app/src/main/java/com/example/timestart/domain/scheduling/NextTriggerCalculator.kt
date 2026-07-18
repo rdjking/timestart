@@ -1,5 +1,8 @@
 package com.example.timestart.domain.scheduling
 
+import com.example.timestart.domain.holiday.HolidayCalendar
+import com.example.timestart.domain.holiday.HolidayDayInfo
+import com.example.timestart.domain.holiday.LocalWeekPatternHolidayCalendar
 import com.example.timestart.domain.model.ScheduleRule
 import com.example.timestart.domain.model.ScheduleTask
 import java.time.DayOfWeek
@@ -9,11 +12,19 @@ import java.time.LocalTime
 import java.time.ZonedDateTime
 
 object NextTriggerCalculator {
-    fun next(task: ScheduleTask, now: ZonedDateTime): ZonedDateTime {
-        return requireNotNull(nextOrNull(task, now)) { "Task has no future trigger" }
+    fun next(
+        task: ScheduleTask,
+        now: ZonedDateTime,
+        holidayCalendar: HolidayCalendar = LocalWeekPatternHolidayCalendar,
+    ): ZonedDateTime {
+        return requireNotNull(nextOrNull(task, now, holidayCalendar)) { "Task has no future trigger" }
     }
 
-    fun nextOrNull(task: ScheduleTask, now: ZonedDateTime): ZonedDateTime? {
+    fun nextOrNull(
+        task: ScheduleTask,
+        now: ZonedDateTime,
+        holidayCalendar: HolidayCalendar = LocalWeekPatternHolidayCalendar,
+    ): ZonedDateTime? {
         require(task.hour in 0..23)
         require(task.minute in 0..59)
 
@@ -21,9 +32,8 @@ object NextTriggerCalculator {
             ScheduleRule.Daily -> nextDaily(task, now)
             ScheduleRule.Weekday -> nextWeekday(task, now)
             ScheduleRule.Weekend -> nextWeekend(task, now)
-            ScheduleRule.StatutoryWorkday,
-            ScheduleRule.HolidayOrWeekend,
-            -> nextDaily(task, now)
+            ScheduleRule.StatutoryWorkday -> nextHolidayMatched(task, now, holidayCalendar) { it.type.isStatutoryWorkday }
+            ScheduleRule.HolidayOrWeekend -> nextHolidayMatched(task, now, holidayCalendar) { it.type.isHolidayOrWeekend }
             is ScheduleRule.Weekly -> nextWeekly(task, now)
             is ScheduleRule.Monthly -> nextMonthly(task, now)
             is ScheduleRule.Once -> nextOnce(task, now)
@@ -37,6 +47,24 @@ object NextTriggerCalculator {
             now.toLocalDate()
         } else {
             now.toLocalDate().plusDays(1)
+        }
+        return ZonedDateTime.of(date, scheduledTime, now.zone)
+    }
+
+    private fun nextHolidayMatched(
+        task: ScheduleTask,
+        now: ZonedDateTime,
+        holidayCalendar: HolidayCalendar,
+        matches: (HolidayDayInfo) -> Boolean,
+    ): ZonedDateTime {
+        val scheduledTime = LocalTime.of(task.hour, task.minute)
+        var date = if (now.toLocalTime().isBefore(scheduledTime)) {
+            now.toLocalDate()
+        } else {
+            now.toLocalDate().plusDays(1)
+        }
+        while (!matches(holidayCalendar.dayInfo(date))) {
+            date = date.plusDays(1)
         }
         return ZonedDateTime.of(date, scheduledTime, now.zone)
     }

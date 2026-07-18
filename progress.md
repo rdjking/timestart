@@ -1,5 +1,16 @@
 # 进度日志
 
+## 2026-07-18：法定节假日与调休规则
+
+- 已创建并切换至 `feature/holiday-calendar` 分支，GitHub 与 Gitee 均已同步。
+- 开始实现第三方节假日 API、本地缓存与两类新重复规则：法定工作日、节假日及周末。
+- 已核实 timor.tech 的日期类型：0 普通工作日、1 周末、2 法定节假日、3 调休上班日；将以每日同步和本地缓存方式实现。
+- 已确认 HTTPS 单日接口可用；不使用文档中的明文 HTTP 示例。
+- 已实现：`STATUTORY_WORKDAY` 与 `HOLIDAY_OR_WEEKEND` 规则、Room v5 节假日缓存、HTTPS timor.tech 客户端与离线周内/周末降级。
+- 已实现：节假日规则任务每天在设定时刻同步当天类型，符合规则才启动目标 App，并始终登记下一天同一时间；网络/缓存来源会写入本地日志。
+- 已通过：`NextTriggerCalculatorTest`、`TaskTriggerCoordinatorTest`、`ScheduleRuleOptionTest` 定向测试与 `assembleDebug`。
+- 真机安装暂未完成：`adb` 返回 `no devices/emulators found`，待设备重新连接。
+
 ## 2026-07-15
 
 ### 阶段 1：需求与技术约束核验
@@ -154,3 +165,14 @@
 - 已实现编辑、复制、日志查看/复制、30 天日志清理和应用名称/包名搜索。
 - `aapt dump badging` 已确认 `application-label:'辰启'` 和 `MainActivity` 启动入口；Debug APK 构建成功。
 - 全量 `testDebugUnitTest` 在 244 秒超时；不可声明为全绿。模拟器 Package Manager 服务缺失，故 `adb install` 无法执行，待更换或修复设备环境。
+
+## 2026-07-18：法定节假日与调休规则真机验证
+
+- 已通过 USB 识别 Android 设备 `49GUFQHUZ5LBRSCI`，成功安装最新 Debug APK，并使用 Monkey 启动 `com.example.timestart`。
+- 应用启动正常，Room v5 数据库迁移未导致启动崩溃。
+- 节假日规则的实际联网判断发生在闹钟触发时；可创建一个两分钟后的“法定工作日”或“节假日及周末”任务，结合本地执行日志观察最终启动或跳过结果。
+
+## 2026-07-18：全量自动化单元测试
+
+- 已执行 `:app:testDebugUnitTest --no-daemon`，共生成 19 个测试套件、55 个测试用例。
+- 测试报告统计：`FAILURES=0`、`ERRORS=0`；当前自动化单元测试全绿。

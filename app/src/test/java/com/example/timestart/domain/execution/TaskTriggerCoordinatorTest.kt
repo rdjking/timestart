@@ -7,6 +7,10 @@ import com.example.timestart.data.local.TimeStartDatabase
 import com.example.timestart.data.repository.TaskScheduler
 import com.example.timestart.domain.model.ScheduleRule
 import com.example.timestart.domain.model.ScheduleTask
+import com.example.timestart.domain.holiday.HolidayCalendar
+import com.example.timestart.domain.holiday.HolidayDataSource
+import com.example.timestart.domain.holiday.HolidayDayInfo
+import com.example.timestart.domain.holiday.HolidayDayType
 import java.time.ZonedDateTime
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -139,6 +143,67 @@ class TaskTriggerCoordinatorTest {
         assertEquals("SKIP_COMPLETED", database.executionLogDao().getForTask(taskId).single().eventType)
     }
 
+    @Test
+    fun `statutory workday launches on a makeup workday`() {
+        val now = ZonedDateTime.parse("2026-07-18T09:00:00+08:00[Asia/Shanghai]")
+        val taskId = database.taskDao().insert(
+            TaskEntity.from(
+                ScheduleTask(
+                    packageName = "com.tencent.wework",
+                    appLabel = "企业微信",
+                    hour = 9,
+                    minute = 0,
+                    rule = ScheduleRule.StatutoryWorkday,
+                ),
+            ).copy(nextTriggerAt = now.toInstant().toEpochMilli()),
+        )
+        val launcher = RecordingLauncher()
+        val coordinator = TaskTriggerCoordinator(
+            taskDao = database.taskDao(),
+            executionLogDao = database.executionLogDao(),
+            scheduler = RecordingScheduler(),
+            launchExecutor = launcher,
+            notificationFallback = RecordingNotificationFallback(),
+            holidayCalendar = FixedHolidayCalendar(HolidayDayType.MAKEUP_WORKDAY),
+            now = { now },
+        )
+
+        coordinator.handleAlarm(taskId)
+
+        assertEquals(listOf("com.tencent.wework"), launcher.requestedPackages)
+    }
+
+    @Test
+    fun `holiday and weekend rule skips a makeup workday`() {
+        val now = ZonedDateTime.parse("2026-07-18T09:00:00+08:00[Asia/Shanghai]")
+        val taskId = database.taskDao().insert(
+            TaskEntity.from(
+                ScheduleTask(
+                    packageName = "com.tencent.wework",
+                    appLabel = "企业微信",
+                    hour = 9,
+                    minute = 0,
+                    rule = ScheduleRule.HolidayOrWeekend,
+                ),
+            ).copy(nextTriggerAt = now.toInstant().toEpochMilli()),
+        )
+        val launcher = RecordingLauncher()
+        val coordinator = TaskTriggerCoordinator(
+            taskDao = database.taskDao(),
+            executionLogDao = database.executionLogDao(),
+            scheduler = RecordingScheduler(),
+            launchExecutor = launcher,
+            notificationFallback = RecordingNotificationFallback(),
+            holidayCalendar = FixedHolidayCalendar(HolidayDayType.MAKEUP_WORKDAY),
+            now = { now },
+        )
+
+        coordinator.handleAlarm(taskId)
+
+        assertEquals(emptyList<String>(), launcher.requestedPackages)
+        assertEquals("HOLIDAY_RULE_SKIPPED", database.executionLogDao().getForTask(taskId).single().eventType)
+    }
+
     private class RecordingScheduler : TaskScheduler {
         val scheduledTaskIds = mutableListOf<Long>()
 
@@ -147,6 +212,13 @@ class TaskTriggerCoordinatorTest {
         }
 
         override fun cancel(taskId: Long) = Unit
+    }
+
+    private class FixedHolidayCalendar(
+        private val type: HolidayDayType,
+    ) : HolidayCalendar {
+        override fun dayInfo(date: java.time.LocalDate): HolidayDayInfo =
+            HolidayDayInfo(type, HolidayDataSource.NETWORK)
     }
 
     private class RecordingLauncher : LaunchExecutor {

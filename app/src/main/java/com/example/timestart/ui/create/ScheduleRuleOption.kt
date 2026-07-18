@@ -17,6 +17,8 @@ enum class ScheduleRuleOption(val label: String) {
     DAILY("每天"),
     WEEKDAY("工作日"),
     WEEKEND("周末"),
+    STATUTORY_WORKDAY("法定工作日"),
+    HOLIDAY_OR_WEEKEND("节假日及周末"),
     WEEKLY("每周"),
     MONTHLY("每月"),
     ONCE("单次"),
@@ -32,6 +34,8 @@ enum class ScheduleRuleOption(val label: String) {
         DAILY -> ScheduleRule.Daily
         WEEKDAY -> ScheduleRule.Weekday
         WEEKEND -> ScheduleRule.Weekend
+        STATUTORY_WORKDAY -> ScheduleRule.StatutoryWorkday
+        HOLIDAY_OR_WEEKEND -> ScheduleRule.HolidayOrWeekend
         WEEKLY -> ScheduleRule.Weekly(selections.weeklyDays.ifEmpty { setOf(date.dayOfWeek) })
         MONTHLY -> ScheduleRule.Monthly(selections.monthlyDays.ifEmpty { setOf(date.dayOfMonth) })
         ONCE -> ScheduleRule.Once(selections.onceDates.ifEmpty { setOf(date) }

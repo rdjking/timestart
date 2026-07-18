@@ -45,3 +45,12 @@
 - https://developer.android.com/topic/performance/background-optimization
 - https://developer.android.com/about/versions/16/setup-sdk
 - https://developer.android.com/develop/background-work/background-tasks/broadcasts/broadcast-exceptions
+
+## 2026-07-18：节假日 API 调研
+
+- timor.tech 的单日查询为 `/api/holiday/info/{yyyy-MM-dd}`；`type.type` 的含义为：`0` 普通工作日、`1` 周末、`2` 法定节假日、`3` 调休上班日。
+- 因此“法定工作日”匹配 `0` 和 `3`；“节假日及周末”匹配 `1` 和 `2`，自然排除调休上班日。
+- 服务也提供批量和年度查询；首版按用户要求在任务触发时同步当天状态、把下一天同一时间重新登记，并将成功结果缓存到 Room。联网失败时降级为普通周一至周五 / 周末判断，且写入本地执行日志。
+- API 文档说明年度数据最多覆盖当前时间往后一年的日期；不能把远未来结果当作可靠数据，采用每日同步可避免这一限制。
+- 来源：timor.tech API 文档（2026-07-18 访问）。
+- 已用 HTTPS 单日接口实测 `2026-07-20`，响应 `code=0`、`type.type=0`、`name=周一`；Android 实现将使用 HTTPS，避免 Android 9+ 的明文 HTTP 限制。

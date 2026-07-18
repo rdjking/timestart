@@ -17,4 +17,12 @@ object TimeStartMigrations {
             )
         }
     }
+
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS holiday_calendar (calendarDate TEXT NOT NULL, dayType INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(calendarDate))",
+            )
+        }
+    }
 }

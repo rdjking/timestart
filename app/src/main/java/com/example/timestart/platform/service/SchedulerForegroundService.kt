@@ -7,9 +7,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.example.timestart.R
 import com.example.timestart.TimeStartApplication
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -29,7 +31,8 @@ class SchedulerForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannel()
         val notification = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(R.drawable.ic_chenqi_notification)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_chenqi_mark))
             .setContentTitle("辰启正在运行")
             .setContentText("定时启动任务将在设定时间自动执行")
             .setOngoing(true)

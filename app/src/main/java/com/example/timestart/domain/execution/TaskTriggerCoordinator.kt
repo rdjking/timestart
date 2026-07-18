@@ -4,6 +4,9 @@ import com.example.timestart.data.local.ExecutionLogDao
 import com.example.timestart.data.local.ExecutionLogEntity
 import com.example.timestart.data.local.TaskDao
 import com.example.timestart.data.repository.TaskScheduler
+import com.example.timestart.domain.holiday.HolidayCalendar
+import com.example.timestart.domain.holiday.LocalWeekPatternHolidayCalendar
+import com.example.timestart.domain.model.ScheduleRule
 import com.example.timestart.domain.scheduling.NextTriggerCalculator
 import java.time.ZonedDateTime
 
@@ -14,6 +17,7 @@ class TaskTriggerCoordinator(
     private val scheduler: TaskScheduler,
     private val launchExecutor: LaunchExecutor,
     private val notificationFallback: NotificationFallback,
+    private val holidayCalendar: HolidayCalendar = LocalWeekPatternHolidayCalendar,
     private val now: () -> ZonedDateTime = ZonedDateTime::now,
 ) {
     fun handleAlarm(taskId: Long) {
@@ -21,13 +25,14 @@ class TaskTriggerCoordinator(
             appendLog(taskId, "ALARM_IGNORED", "TASK_NOT_FOUND", "Task was deleted before its alarm fired")
             return
         }
+        val triggerTime = now()
 
         if (entity.resumeAfterSkippedOccurrence) {
             val skippedOccurrence = entity.nextTriggerAt
-                ?.let { java.time.Instant.ofEpochMilli(it).atZone(now().zone) }
+                ?.let { java.time.Instant.ofEpochMilli(it).atZone(triggerTime.zone) }
             val nextTrigger = NextTriggerCalculator.nextOrNull(
                 entity.toScheduleTask(),
-                skippedOccurrence?.plusNanos(1) ?: now(),
+                skippedOccurrence?.plusNanos(1) ?: triggerTime,
             )
             taskDao.updateNextTriggerAt(taskId, nextTrigger?.toInstant()?.toEpochMilli())
             taskDao.setResumeAfterSkippedOccurrence(taskId, false)
@@ -47,7 +52,8 @@ class TaskTriggerCoordinator(
             return
         }
 
-        val nextTrigger = NextTriggerCalculator.nextOrNull(entity.toScheduleTask(), now())
+        val scheduleTask = entity.toScheduleTask()
+        val nextTrigger = NextTriggerCalculator.nextOrNull(scheduleTask, triggerTime)
         if (nextTrigger == null) {
             taskDao.updateNextTriggerAt(taskId, null)
             taskDao.setEnabled(taskId, false)
@@ -55,6 +61,28 @@ class TaskTriggerCoordinator(
         } else {
             taskDao.updateNextTriggerAt(taskId, nextTrigger.toInstant().toEpochMilli())
             scheduler.schedule(taskId)
+        }
+
+        val holidayDay = when (scheduleTask.rule) {
+            ScheduleRule.StatutoryWorkday,
+            ScheduleRule.HolidayOrWeekend,
+            -> holidayCalendar.dayInfo(triggerTime.toLocalDate())
+
+            else -> null
+        }
+        val shouldLaunch = when (scheduleTask.rule) {
+            ScheduleRule.StatutoryWorkday -> holidayDay!!.type.isStatutoryWorkday
+            ScheduleRule.HolidayOrWeekend -> holidayDay!!.type.isHolidayOrWeekend
+            else -> true
+        }
+        if (!shouldLaunch) {
+            appendLog(
+                taskId = taskId,
+                eventType = "HOLIDAY_RULE_SKIPPED",
+                resultCode = holidayDay!!.type.name,
+                message = "Holiday rule skipped this date using ${holidayDay.source.name} data",
+            )
+            return
         }
 
         val launchResult = launchExecutor.requestLaunch(entity.packageName)

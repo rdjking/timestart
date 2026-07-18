@@ -8,6 +8,8 @@ sealed interface ScheduleRule {
     data object Daily : ScheduleRule
     data object Weekday : ScheduleRule
     data object Weekend : ScheduleRule
+    data object StatutoryWorkday : ScheduleRule
+    data object HolidayOrWeekend : ScheduleRule
     data class Weekly(val days: Set<DayOfWeek>) : ScheduleRule {
         init {
             require(days.isNotEmpty())

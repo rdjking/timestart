@@ -89,6 +89,22 @@ class NextTriggerCalculatorTest {
     }
 
     @Test
+    fun `checks every day for a statutory workday schedule`() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val task = ScheduleTask(hour = 8, minute = 30, rule = ScheduleRule.StatutoryWorkday)
+
+        val result = NextTriggerCalculator.next(
+            task,
+            ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(8, 0), zone),
+        )
+
+        assertEquals(
+            ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(8, 30), zone),
+            result,
+        )
+    }
+
+    @Test
     fun `moves from Friday night to Saturday for a weekend schedule`() {
         val zone = ZoneId.of("Asia/Shanghai")
         val task = ScheduleTask(hour = 10, minute = 0, rule = ScheduleRule.Weekend)

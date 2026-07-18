@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -179,35 +180,51 @@ fun CreateTaskScreen(
     }
 
     if (showRuleSheet) {
-        ModalBottomSheet(onDismissRequest = { showRuleSheet = false }) {
-            Text(
-                "选择重复规则",
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                "日期会作为单次、每周、每月和每年规则的基准。",
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ScheduleRuleOption.entries.forEach { option ->
-                ListItem(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        rule = option
-                        showRuleSheet = false
-                        if (option in setOf(ScheduleRuleOption.WEEKLY, ScheduleRuleOption.MONTHLY, ScheduleRuleOption.YEARLY, ScheduleRuleOption.ONCE)) {
-                            showRuleDetailsFor = option
-                        }
-                    },
-                    headlineContent = { Text(option.label) },
-                    supportingContent = { Text(ruleDescription(option, date)) },
-                    trailingContent = {
-                        if (rule == option) Text("已选择", color = MaterialTheme.colorScheme.primary)
-                    },
+        ModalBottomSheet(
+            onDismissRequest = { showRuleSheet = false },
+            sheetGesturesEnabled = false,
+            dragHandle = null,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 320.dp, max = 600.dp),
+            ) {
+                Text(
+                    "选择重复规则",
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.titleLarge,
                 )
+                Text(
+                    "日期会作为单次、每周、每月和每年规则的基准。",
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 460.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    items(ScheduleRuleOption.entries.toList()) { option ->
+                        ListItem(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                rule = option
+                                showRuleSheet = false
+                                if (option in setOf(ScheduleRuleOption.WEEKLY, ScheduleRuleOption.MONTHLY, ScheduleRuleOption.YEARLY, ScheduleRuleOption.ONCE)) {
+                                    showRuleDetailsFor = option
+                                }
+                            },
+                            headlineContent = { Text(option.label) },
+                            supportingContent = { Text(ruleDescription(option, date)) },
+                            trailingContent = {
+                                if (rule == option) Text("已选择", color = MaterialTheme.colorScheme.primary)
+                            },
+                        )
+                    }
+                }
             }
-            Surface(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {}
         }
     }
 
@@ -615,6 +632,8 @@ private fun ruleDescription(
     ScheduleRuleOption.DAILY -> "每天在设定时间执行"
     ScheduleRuleOption.WEEKDAY -> "周一至周五执行"
     ScheduleRuleOption.WEEKEND -> "周六、周日执行"
+    ScheduleRuleOption.STATUTORY_WORKDAY -> "周一至周五（除法定节假日）及调休上班日执行"
+    ScheduleRuleOption.HOLIDAY_OR_WEEKEND -> "法定节假日及周末执行（调休上班日除外）"
     ScheduleRuleOption.WEEKLY -> selections.weeklyDays.ifEmpty { setOf(date.dayOfWeek) }
         .sortedBy { it.value }.joinToString("、", prefix = "每周", postfix = "执行") { it.localizedName() }
     ScheduleRuleOption.MONTHLY -> selections.monthlyDays.ifEmpty { setOf(date.dayOfMonth) }

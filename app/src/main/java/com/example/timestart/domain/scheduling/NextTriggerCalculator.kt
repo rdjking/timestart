@@ -21,6 +21,9 @@ object NextTriggerCalculator {
             ScheduleRule.Daily -> nextDaily(task, now)
             ScheduleRule.Weekday -> nextWeekday(task, now)
             ScheduleRule.Weekend -> nextWeekend(task, now)
+            ScheduleRule.StatutoryWorkday,
+            ScheduleRule.HolidayOrWeekend,
+            -> nextDaily(task, now)
             is ScheduleRule.Weekly -> nextWeekly(task, now)
             is ScheduleRule.Monthly -> nextMonthly(task, now)
             is ScheduleRule.Once -> nextOnce(task, now)

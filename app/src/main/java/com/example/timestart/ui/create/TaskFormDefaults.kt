@@ -10,6 +10,8 @@ internal fun TaskEntity.toScheduleRuleOption(): ScheduleRuleOption = when (ruleT
     "DAILY" -> ScheduleRuleOption.DAILY
     "WEEKDAY" -> ScheduleRuleOption.WEEKDAY
     "WEEKEND" -> ScheduleRuleOption.WEEKEND
+    "STATUTORY_WORKDAY" -> ScheduleRuleOption.STATUTORY_WORKDAY
+    "HOLIDAY_OR_WEEKEND" -> ScheduleRuleOption.HOLIDAY_OR_WEEKEND
     "WEEKLY" -> ScheduleRuleOption.WEEKLY
     "MONTHLY" -> ScheduleRuleOption.MONTHLY
     "ONCE" -> ScheduleRuleOption.ONCE

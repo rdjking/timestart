@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
+import com.example.timestart.R
 import com.example.timestart.domain.execution.NotificationFallback
 import com.example.timestart.domain.execution.NotificationFallbackResult
 import com.example.timestart.platform.alarm.TaskRequestCode
@@ -39,7 +41,8 @@ class AndroidNotificationFallback(
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val notification = android.app.Notification.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setSmallIcon(R.drawable.ic_chenqi_notification)
+                .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_chenqi_mark))
                 .setContentTitle("定时启动：$appLabel")
                 .setContentText("点按打开$appLabel")
                 .setContentIntent(pendingIntent)

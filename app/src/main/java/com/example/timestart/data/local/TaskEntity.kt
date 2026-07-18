@@ -45,6 +45,8 @@ private fun ScheduleRule.persistenceName(): String = when (this) {
     ScheduleRule.Daily -> "DAILY"
     ScheduleRule.Weekday -> "WEEKDAY"
     ScheduleRule.Weekend -> "WEEKEND"
+    ScheduleRule.StatutoryWorkday -> "STATUTORY_WORKDAY"
+    ScheduleRule.HolidayOrWeekend -> "HOLIDAY_OR_WEEKEND"
     is ScheduleRule.Weekly -> "WEEKLY"
     is ScheduleRule.Monthly -> "MONTHLY"
     is ScheduleRule.Once -> "ONCE"
@@ -55,6 +57,8 @@ private fun ScheduleRule.persistenceValue(): String? = when (this) {
     ScheduleRule.Daily,
     ScheduleRule.Weekday,
     ScheduleRule.Weekend,
+    ScheduleRule.StatutoryWorkday,
+    ScheduleRule.HolidayOrWeekend,
     -> null
 
     is ScheduleRule.Weekly -> days
@@ -72,6 +76,8 @@ private fun String.toScheduleRule(value: String?): ScheduleRule = when (this) {
     "DAILY" -> ScheduleRule.Daily
     "WEEKDAY" -> ScheduleRule.Weekday
     "WEEKEND" -> ScheduleRule.Weekend
+    "STATUTORY_WORKDAY" -> ScheduleRule.StatutoryWorkday
+    "HOLIDAY_OR_WEEKEND" -> ScheduleRule.HolidayOrWeekend
     "WEEKLY" -> ScheduleRule.Weekly(
         requireNotNull(value) { "WEEKLY rule requires selected days" }
             .split(',')

@@ -75,6 +75,8 @@ private fun String.toRuleLabel(): String = when (this) {
     "DAILY" -> "每天"
     "WEEKDAY" -> "工作日"
     "WEEKEND" -> "周末"
+    "STATUTORY_WORKDAY" -> "法定工作日"
+    "HOLIDAY_OR_WEEKEND" -> "节假日及周末"
     "WEEKLY" -> "每周"
     "MONTHLY" -> "每月"
     "ONCE" -> "单次"

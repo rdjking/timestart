@@ -99,6 +99,46 @@ class TaskTriggerCoordinatorTest {
         assertEquals("DISPLAYED", notificationLog.resultCode)
     }
 
+    @Test
+    fun `passing a skipped occurrence restores the task without launching its app`() {
+        val now = ZonedDateTime.parse("2026-07-17T18:00:00+08:00[Asia/Shanghai]")
+        val taskId = database.taskDao().insert(
+            TaskEntity.from(
+                ScheduleTask(
+                    packageName = "com.tencent.wework",
+                    appLabel = "企业微信",
+                    hour = 18,
+                    minute = 0,
+                    rule = ScheduleRule.Daily,
+                ),
+            ).copy(
+                enabled = false,
+                nextTriggerAt = now.toInstant().toEpochMilli(),
+                resumeAfterSkippedOccurrence = true,
+            ),
+        )
+        val scheduler = RecordingScheduler()
+        val launcher = RecordingLauncher()
+        val coordinator = TaskTriggerCoordinator(
+            taskDao = database.taskDao(),
+            executionLogDao = database.executionLogDao(),
+            scheduler = scheduler,
+            launchExecutor = launcher,
+            notificationFallback = RecordingNotificationFallback(),
+            now = { now },
+        )
+
+        coordinator.handleAlarm(taskId)
+
+        val task = database.taskDao().getById(taskId)
+        assertEquals(true, task?.enabled)
+        assertEquals(false, task?.resumeAfterSkippedOccurrence)
+        assertEquals(now.plusDays(1).toInstant().toEpochMilli(), task?.nextTriggerAt)
+        assertEquals(listOf(taskId), scheduler.scheduledTaskIds)
+        assertEquals(emptyList<String>(), launcher.requestedPackages)
+        assertEquals("SKIP_COMPLETED", database.executionLogDao().getForTask(taskId).single().eventType)
+    }
+
     private class RecordingScheduler : TaskScheduler {
         val scheduledTaskIds = mutableListOf<Long>()
 

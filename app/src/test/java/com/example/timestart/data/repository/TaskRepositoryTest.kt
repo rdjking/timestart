@@ -105,6 +105,38 @@ class TaskRepositoryTest {
     }
 
     @Test
+    fun `skipping the current occurrence temporarily disables a daily task until its scheduled time`() {
+        val now = ZonedDateTime.parse("2026-07-17T17:30:00+08:00[Asia/Shanghai]")
+        val deterministicRepository = TaskRepository(
+            database.taskDao(),
+            database.executionLogDao(),
+            scheduler,
+            now = { now },
+        )
+        val id = deterministicRepository.save(
+            TaskEntity(
+                packageName = "com.tencent.wework",
+                appLabel = "企业微信",
+                hour = 18,
+                minute = 0,
+                ruleType = "DAILY",
+            ),
+        )
+
+        deterministicRepository.skipCurrentOccurrence(id)
+
+        val task = database.taskDao().getById(id)
+        assertEquals(false, task?.enabled)
+        assertEquals(true, task?.resumeAfterSkippedOccurrence)
+        assertEquals(
+            ZonedDateTime.parse("2026-07-17T18:00:00+08:00[Asia/Shanghai]").toInstant().toEpochMilli(),
+            task?.nextTriggerAt,
+        )
+        assertEquals(listOf(id, id), scheduler.scheduledIds)
+        assertEquals("OCCURRENCE_SKIPPED", database.executionLogDao().getForTask(id).single().eventType)
+    }
+
+    @Test
     fun `delete cancels scheduling removes task and writes a log`() {
         val id = repository.save(
             TaskEntity(packageName = "com.tencent.wework", appLabel = "企业微信", hour = 18, minute = 0, ruleType = "WEEKDAY"),
